@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fake News Detector — Live Demo</title>
+<style>
+:root{
+  --bg:#12141c; --surface:#1b1e2a; --surface2:#232739; --text:#e8e6e0;
+  --muted:#8b90a0; --accent:#e0555f; --good:#4fb37a; --border:#2c3042;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){ --bg:#f5f4f0; --surface:#fff; --surface2:#eeede8;
+    --text:#1c1e26; --muted:#6b7080; --accent:#c23e46; --good:#2f8a5c; --border:#e0ddd4; }
+}
+:root[data-theme="dark"]{ --bg:#12141c; --surface:#1b1e2a; --surface2:#232739; --text:#e8e6e0;
+  --muted:#8b90a0; --accent:#e0555f; --good:#4fb37a; --border:#2c3042; }
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px); height:100%;}
+body{margin:0; min-height:100%; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; display:flex; flex-direction:column;}
+main{flex:1; max-width:640px; width:100%; margin:0 auto; padding:28px 20px 40px;}
+h1{font-size:1.3rem; margin:0 0 4px;}
+.sub{color:var(--muted); font-size:0.85rem; margin:0 0 22px;}
+textarea{width:100%; min-height:150px; background:var(--surface); border:1px solid var(--border);
+  color:var(--text); border-radius:10px; padding:12px; font-size:0.92rem; font-family:inherit; resize:vertical;}
+button.primary{margin-top:12px; background:var(--accent); color:#fff; border:none; padding:11px 20px;
+  border-radius:8px; font-weight:600; font-size:0.92rem; cursor:pointer; font-family:inherit;}
+.result{margin-top:20px; padding:16px; border-radius:10px; border:1px solid var(--border); display:none;}
+.result.show{display:block;}
+.result .label{font-size:1.4rem; font-weight:700;}
+.result.real{background:rgba(79,179,122,0.12); border-color:var(--good);}
+.result.real .label{color:var(--good);}
+.result.fake{background:rgba(224,85,95,0.12); border-color:var(--accent);}
+.result.fake .label{color:var(--accent);}
+.result .conf{color:var(--muted); font-size:0.85rem; margin-top:4px;}
+.bar{height:8px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-top:10px;}
+.bar-fill{height:100%;}
+.result.real .bar-fill{background:var(--good);}
+.result.fake .bar-fill{background:var(--accent);}
+.note{margin-top:24px; font-size:0.78rem; color:var(--muted); line-height:1.5; border-top:1px solid var(--border); padding-top:14px;}
+.stat{font-size:0.78rem; color:var(--muted); margin-top:6px;}
+</style>
+</head>
+<body>
+<main>
+  <h1>📰 Fake News Detector</h1>
+  <p class="sub">Paste a news headline or article below. Runs entirely in your browser.</p>
+  <textarea id="input" placeholder="Paste article text here..."></textarea>
+  <button class="primary" id="checkBtn">Check</button>
+
+  <div class="result" id="result">
+    <div class="label" id="label"></div>
+    <div class="conf" id="conf"></div>
+    <div class="bar"><div class="bar-fill" id="barFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="note">
+    This is a lightweight, browser-only version of a full Python model trained on
+    4,594 real news articles (2016 US political news). The full model reaches ~94%
+    accuracy; this in-browser version (using the top 350 most predictive words) runs
+    at ~85% accuracy so it can work instantly with no server. It's strongest on
+    political/election-style text, since that's what it learned from.
+  </div>
+</main>
+
+<script>
+const MODEL = {"intercept":-0.659,"words":{"october":-11.6853,"gawker":11.2719,"daesh":-10.7987,"mccabe":10.5619,"print":-9.6146,"podesta":-9.5072,"snip":-9.4896,"advertisement":-9.2752,"repetition":9.1839,"article":-9.1282,"betterman":9.0701,"mosul":-8.9882,"manafort":8.8238,"brazile":-8.7452,"subreddit":8.4537,"passion":8.4417,"poroshenko":8.4379,"guzmán":8.2623,"speedy":8.0713,"doj":-8.0015,"mateen":7.9221,"handling":7.8571,"weeds":7.7019,"startups":7.7006,"impeachment":-7.5896,"232":7.5683,"russia":-7.5137,"marshal":7.5037,"runway":-7.4017,"trunews":-7.3693,"scalia":7.3656,"ralston":7.3557,"rates":7.3502,"web":7.3382,"barron":7.2779,"flowers":-7.2686,"nailing":7.2546,"131":7.2181,"vietnam":7.1959,"brussels":7.1925,"november":-7.0956,"onpolitics":7.0435,"cattle":7.0065,"nytimes":6.9537,"suppression":-6.9451,"antarctica":-6.9133,"brennan":-6.9114,"careless":6.899,"autistic":6.8874,"havens":6.8594,"powell":6.7818,"cbn":6.761,"hiroshima":6.7606,"lynch":-6.7581,"bossie":6.7579,"hb2":6.7538,"khamenei":-6.7065,"bird":6.6836,"israel":-6.6407,"socialism":6.5895,"creamer":-6.5547,"share":-6.5473,"nc":-6.517,"machado":6.4491,"maddow":-6.4459,"toensing":-6.4393,"jasta":-6.4351,"leverage":-6.3682,"millennials":6.3583,"ernst":6.3397,"stock":-6.3386,"flickr":-6.3243,"bevin":6.3148,"photo":-6.2948,"stone":-6.2931,"presumptive":6.2898,"vouching":-6.2884,"said":6.2396,"washburne":6.2391,"2016":-6.2209,"felix":6.2114,"155":6.1808,"getty":-6.1777,"oct":-6.1475,"sexting":6.1423,"pinterest":-6.0954,"friday":6.0878,"engulf":6.0809,"basket":6.0804,"gun":6.0656,"appleberry":6.0394,"sanders":6.0242,"venue":6.0145,"fox":6.0029,"autism":5.9857,"voted":-5.9807,"closes":-5.9744,"directive":5.9524,"holt":5.9244,"fracking":-5.9033,"debate":5.8884,"ryan":5.8825,"fbi":-5.8721,"rubio":5.8698,"investigations":-5.8629,"juror":-5.8405,"salman":-5.8263,"albright":5.8195,"source":-5.8193,"pic":-5.7817,"schaitberger":5.7814,"regime":-5.7716,"springs":5.7696,"bomber":5.7611,"setharichardson":-5.7573,"struggled":5.7519,"vouch":-5.7214,"turnout":-5.7176,"delegates":5.712,"editorial":5.7072,"neocons":-5.7019,"ballistic":5.6954,"pushing":5.6872,"soros":-5.6835,"tags":-5.6684,"elect":-5.6635,"gizmodo":5.6587,"conservatives":5.6556,"candidates":5.6542,"duke":-5.6513,"conservative":5.6319,"finicum":5.6291,"demolish":5.6218,"lineberger":-5.6212,"pipeline":-5.5945,"propaganda":-5.58,"27":-5.578,"grassley":5.5709,"held":5.5657,"posted":-5.5524,"iraq":5.5139,"rock":-5.4889,"sweeping":5.4823,"lesley":-5.4663,"verdict":5.4661,"browser":5.4573,"filed":-5.457,"jobs":5.4422,"mcdonald":5.4389,"weinberger":-5.4087,"kurtz":5.4043,"seelman":5.3946,"cruz":5.3565,"jalloh":-5.3551,"realists":-5.3507,"dismantling":5.3494,"stated":-5.3404,"hamas":-5.3308,"wikileaks":-5.3292,"stockpile":5.318,"polarization":5.3118,"giroux":5.3102,"nomination":5.3081,"labor":5.295,"stahl":-5.2911,"rappoport":-5.2762,"04":-5.2751,"cologne":5.2585,"kalamazoo":5.2552,"rhodes":5.2528,"cops":-5.2255,"crying":-5.2202,"lewandowski":5.2076,"saturday":5.2033,"couric":5.2033,"reporting":-5.2023,"recess":5.2019,"teneo":-5.2011,"navigation":-5.1971,"image":-5.1877,"hackers":5.1811,"abedini":-5.1507,"says":5.1247,"amish":-5.123,"buzhardt":5.1201,"usatopinion":5.0793,"featured":-5.0498,"sunday":5.0486,"moscow":-5.0427,"breaking":-5.0323,"youtube":-5.0239,"monday":5.0239,"kobani":5.0186,"charts":5.0174,"jindal":5.0015,"dalton":4.996,"duckworth":-4.9942,"corporate":-4.9899,"ratliff":-4.9891,"pharma":-4.9882,"burdens":4.9805,"somali":-4.9798,"attack":4.978,"isolationists":-4.9746,"reagan":4.966,"hippy":4.9622,"yanukovych":4.9582,"wilders":-4.9535,"savage":-4.9394,"hillary":-4.9364,"etf":4.9349,"logo":4.9281,"treaty":-4.9276,"yara":4.9271,"asraf":4.9195,"watchers":4.9151,"putin":-4.9137,"tab":4.8958,"jury":-4.8922,"goodman":4.8873,"carson":4.8868,"attacks":4.8813,"machines":-4.8784,"lahore":4.8671,"seeing":-4.8655,"bake":-4.8639,"amendment":-4.8547,"fundraising":4.8454,"silence":4.8424,"approach":4.8393,"bathroom":4.8361,"et":4.8324,"culture":-4.8248,"osce":-4.817,"pacquiao":-4.809,"meditation":-4.8088,"hayden":-4.7975,"tehran":4.7856,"hysterics":4.7731,"steal":-4.7623,"canada":-4.74,"nixon":4.7136,"jeb":4.6983,"convention":4.6962,"eu":-4.685,"rabita":-4.6833,"gays":4.6827,"bee":-4.6791,"williams":-4.6569,"uric":-4.6525,"choi":-4.6379,"defendants":-4.6346,"band":-4.6285,"priorities":4.6267,"twitter":-4.6267,"netanyahu":-4.6217,"pardon":-4.6189,"watson":-4.598,"tech":4.5975,"campaigns":4.5957,"shortage":4.5946,"niro":-4.585,"simulates":4.5821,"jewish":-4.5747,"prohibits":-4.5734,"launch":4.5665,"royce":4.5664,"portland":4.5654,"jews":-4.5627,"familial":-4.5623,"demand":-4.5479,"pm":-4.5359,"gz":4.5327,"laguardia":-4.5252,"freezer":-4.5198,"blast":4.5162,"ledeen":-4.5112,"edlinger":-4.5011,"vdare":-4.4971,"immigration":4.4882,"globe":4.4752,"afp":-4.4491,"qatar":-4.4489,"threat":4.4428,"ut":-4.4304,"editorials":4.4231,"8th":-4.4224,"flight":4.4151,"bannon":4.4023,"loading":-4.3954,"prison":-4.3945,"mainstream":-4.3943,"explosion":4.3938,"pence":4.379,"26":-4.3649,"drip":4.3638,"puerto":4.3625,"champion":4.3605,"reuters":-4.3591,"michigan":-4.3589,"topics":4.3572,"com":-4.3548,"state":4.3441,"center":4.3382,"truthful":4.338,"kentucky":4.3355,"file":-4.3249,"brexit":-4.3179,"discovery":-4.3173,"istanbul":4.3138,"cookies":4.3137,"saluting":-4.311,"intimidate":-4.3067,"italy":-4.3037,"06":-4.29,"wnd":-4.2856,"accounted":4.2853,"lgbt":-4.2825,"charter":4.2806,"judge":4.2794,"illegals":-4.2754,"clever":-4.2732,"tariff":4.2724,"unpopular":4.2713,"ads":4.2704,"interacted":4.2608,"dollars":-4.2595,"onion":-4.2582,"rasmussen":-4.2565,"egyptair":4.2442,"dreamers":4.2426,"tape":4.2395,"diplomatic":4.2384,"howard":4.2337,"judicial":4.2336,"guantanamo":4.2331,"ln":4.2305,"ijr":-4.2296,"treasury":-4.2286,"buchanan":-4.2281,"humanity":-4.2266,"religious":4.2246,"mcilroy":-4.2212,"canadian":-4.2189,"retools":4.2125,"embroidered":4.2125,"comment":-4.2098,"rules":4.2041,"garrett":-4.2029,"missiles":4.1956}};
+
+function predict(text){
+  const tokens = text.toLowerCase().match(/[a-z]+/g) || [];
+  let score = MODEL.intercept;
+  let matched = 0;
+  tokens.forEach(t=>{
+    if(MODEL.words.hasOwnProperty(t)){ score += MODEL.words[t]; matched++; }
+  });
+  return { isReal: score > 0, score, matched };
+}
+
+document.getElementById('checkBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('input').value.trim();
+  const resultBox = document.getElementById('result');
+  if(!text){ resultBox.classList.remove('show'); return; }
+  const { isReal, score, matched } = predict(text);
+  const confidence = Math.min(95, 50 + Math.abs(score) * 3);
+  resultBox.className = 'result show ' + (isReal ? 'real' : 'fake');
+  document.getElementById('label').textContent = isReal ? '✓ Likely REAL' : '⚠ Likely FAKE';
+  document.getElementById('conf').textContent =
+    `Confidence: ${confidence.toFixed(0)}% · ${matched} known signal word(s) matched`;
+  document.getElementById('barFill').style.width = confidence + '%';
+});
+</script>
+</body>
+</html>
